@@ -54,7 +54,7 @@ Pluploader.prototype.deleteStalledUploads = function() {
  *
  * @param {Request} req
  */
-Pluploader.prototype.finalizePendingUploads = function(req) {
+Pluploader.prototype.finalizePendingUploads = function(req, res, path, fields) {
   var self = this;
 
   Object.keys(self.pendingUploads).forEach(function(fileIdentifier) {
@@ -76,6 +76,10 @@ Pluploader.prototype.finalizePendingUploads = function(req) {
 
       self.emit('fileUploaded', {
         name: filesData.name,
+        path : path,
+        res : res,
+        fields : fields,
+        filesData: filesData,
         data: wholeFile,
         size: wholeFile.length,
         type: mimeType
@@ -112,16 +116,17 @@ Pluploader.prototype.handleRequest = function plupload(req, res) {
 
   var form = new multiparty.Form(this.options),
     self = this;
-
+  
   form.parse(req, function(err, fields, files) {
 
     if (!fields.chunk) {
       fields.chunk = [0];
       fields.chunks = [1];
     }
-
+    
     var name = fields.name[0],
       chunks = fields.chunks[0];
+      
 
     var fileIdentifier = name + chunks[0];
 
@@ -154,12 +159,16 @@ Pluploader.prototype.handleRequest = function plupload(req, res) {
         } else {
           
           var filesData = self.pendingUploads[fileIdentifier];
-          self.finalizePendingUploads(req);
+          self.finalizePendingUploads(req, res, files.file[0].path, fields);
           
-          res.json({
-            'jsonrpc': '2.0',
-            'id': filesData.name
-          });
+          if (filesData.chunks != filesData.files.length) {
+              res.json({
+                'jsonrpc': '2.0',
+                'id': filesData.name
+              });
+          } else {
+              //console.log('After finalizePendingUploads')
+          }
         }
       });
     })
